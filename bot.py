@@ -116,15 +116,25 @@ async def top(msg: types.Message):
 async def winners(msg: types.Message):
     if msg.from_user.id != ADMIN_ID:
         return
-    cursor.execute("SELECT username, tg_id, referrals_count FROM users WHERE referrals_count >= 10 ORDER BY referrals_count DESC")
-    rows = cursor.fetchall()
-    if not rows:
-        await msg.answer("Пока никто не достиг порога для приза.")
-        return
-    text = "🎁 Участники, которые заслужили приз:\n\n"
-    for username, tg_id, refs in rows:
-        name = f"@{username}" if username else f"id:{tg_id}"
-        text += f"{name} — {refs} приглашённых\n"
+
+    text = "🎁 Победители по уровням:\n\n"
+
+    levels = [
+        (3, "Мерч 🎁"),
+        (10, "Худи или сертификат"),
+        (25, "Умные весы или наушники")
+    ]
+
+    for threshold, prize in levels:
+        cursor.execute("SELECT username, tg_id, referrals_count FROM users WHERE referrals_count >= ? ORDER BY referrals_count DESC", (threshold,))
+        rows = cursor.fetchall()
+        if rows:
+            text += f"— Уровень {threshold}+ ({prize}):\n"
+            for username, tg_id, refs in rows:
+                name = f"@{username}" if username else f"id:{tg_id}"
+                text += f"   {name} — {refs} приглашённых\n"
+            text += "\n"
+
     await msg.answer(text)
 
 @dp.message(Command("giveprize"))
