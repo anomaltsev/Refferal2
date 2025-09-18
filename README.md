@@ -6,6 +6,10 @@
 - Подсчёт друзей
 - Команда /me для участника
 - Команда /admin_stats для администратора
+- Команда /top - ТОП-20 участников
+- Команда /winners - список заслуживших призы
+- Команда /giveprize <user_id> <название> - отметить вручение приза
+- Команда /prizeslog - журнал выданных призов
 
 ## ⚙️ Запуск локально
 ```bash
@@ -17,7 +21,7 @@ python bot.py
 
 ## ☁️ Запуск на Render
 1. Создай репозиторий на GitHub и залей эти файлы.
-2. На [Render](https://render.com) → New Web Service → подключи репозиторий.
+2. На [Render](https://render.com) → New Background Worker → подключи репозиторий.
 3. Build Command:
 ```bash
 pip install -r requirements.txt

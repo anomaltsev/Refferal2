@@ -9,10 +9,7 @@ API_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = "@producersdelok"   # канал для проверки подписки
 ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))
 
-bot = Bot(
-    token=API_TOKEN,
-    default=DefaultBotProperties(parse_mode="HTML")
-)
+bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
 # --- база sqlite ---
@@ -24,6 +21,14 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT,
     referrer_id INTEGER,
     referrals_count INTEGER DEFAULT 0
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS prizes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tg_id INTEGER NOT NULL,
+    prize TEXT NOT NULL,
+    given_at TEXT DEFAULT CURRENT_TIMESTAMP
 )
 """)
 conn.commit()
@@ -90,6 +95,65 @@ async def admin_stats(msg: types.Message):
     total_users, total_refs = cursor.fetchone()
     await msg.answer(f"👥 Пользователей: {total_users}\n"
                      f"🔗 Всего рефералов: {total_refs}")
+
+# --- новые админ-команды ---
+@dp.message(Command("top"))
+async def top(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    cursor.execute("SELECT username, tg_id, referrals_count FROM users ORDER BY referrals_count DESC LIMIT 20")
+    rows = cursor.fetchall()
+    if not rows:
+        await msg.answer("Пока нет участников.")
+        return
+    text = "🏆 ТОП-20 участников:\n\n"
+    for i, (username, tg_id, refs) in enumerate(rows, start=1):
+        name = f"@{username}" if username else f"id:{tg_id}"
+        text += f"{i}. {name} — {refs} приглашённых\n"
+    await msg.answer(text)
+
+@dp.message(Command("winners"))
+async def winners(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    cursor.execute("SELECT username, tg_id, referrals_count FROM users WHERE referrals_count >= 10 ORDER BY referrals_count DESC")
+    rows = cursor.fetchall()
+    if not rows:
+        await msg.answer("Пока никто не достиг порога для приза.")
+        return
+    text = "🎁 Участники, которые заслужили приз:\n\n"
+    for username, tg_id, refs in rows:
+        name = f"@{username}" if username else f"id:{tg_id}"
+        text += f"{name} — {refs} приглашённых\n"
+    await msg.answer(text)
+
+@dp.message(Command("giveprize"))
+async def giveprize(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    parts = msg.text.split(maxsplit=2)
+    if len(parts) < 3:
+        await msg.answer("Используй: /giveprize <user_id> <название приза>")
+        return
+    tg_id = int(parts[1])
+    prize = parts[2]
+    cursor.execute("INSERT INTO prizes (tg_id, prize) VALUES (?, ?)", (tg_id, prize))
+    conn.commit()
+    await msg.answer(f"✅ Приз «{prize}» отмечен для пользователя {tg_id}")
+
+@dp.message(Command("prizeslog"))
+async def prizeslog(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    cursor.execute("SELECT tg_id, prize, given_at FROM prizes ORDER BY given_at DESC LIMIT 20")
+    rows = cursor.fetchall()
+    if not rows:
+        await msg.answer("Журнал пока пуст.")
+        return
+    text = "📂 Журнал призов:\n\n"
+    for tg_id, prize, given_at in rows:
+        text += f"👤 {tg_id} — {prize} ({given_at})\n"
+    await msg.answer(text)
 
 async def main():
     await dp.start_polling(bot)
