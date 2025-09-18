@@ -128,12 +128,25 @@ async def winners(msg: types.Message):
     for threshold, prize in levels:
         cursor.execute("SELECT username, tg_id, referrals_count FROM users WHERE referrals_count >= ? ORDER BY referrals_count DESC", (threshold,))
         rows = cursor.fetchall()
+        text += f"— Уровень {threshold}+ ({prize}):\n"
         if rows:
-            text += f"— Уровень {threshold}+ ({prize}):\n"
             for username, tg_id, refs in rows:
                 name = f"@{username}" if username else f"id:{tg_id}"
                 text += f"   {name} — {refs} приглашённых\n"
-            text += "\n"
+        else:
+            text += "   (пока пусто)\n"
+        text += "\n"
+
+    # ТОП-20 месяца
+    cursor.execute("SELECT username, tg_id, referrals_count FROM users ORDER BY referrals_count DESC LIMIT 20")
+    rows = cursor.fetchall()
+    text += "🏆 ТОП-20 месяца:\n"
+    if rows:
+        for i, (username, tg_id, refs) in enumerate(rows, start=1):
+            name = f"@{username}" if username else f"id:{tg_id}"
+            text += f"{i}. {name} — {refs} приглашённых\n"
+    else:
+        text += "   (пока пусто)\n"
 
     await msg.answer(text)
 
@@ -164,6 +177,15 @@ async def prizeslog(msg: types.Message):
     for tg_id, prize, given_at in rows:
         text += f"👤 {tg_id} — {prize} ({given_at})\n"
     await msg.answer(text)
+
+@dp.message(Command("exportdb"))
+async def exportdb(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    try:
+        await msg.answer_document(open("referrals.db", "rb"))
+    except Exception as e:
+        await msg.answer(f"Ошибка при экспорте: {e}")
 
 async def main():
     await dp.start_polling(bot)
