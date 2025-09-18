@@ -3,12 +3,16 @@ import sqlite3
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart, Command
+from aiogram.client.default import DefaultBotProperties
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = "@producersdelok"   # канал для проверки подписки
 ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))
 
-bot = Bot(token=API_TOKEN, parse_mode="HTML")
+bot = Bot(
+    token=API_TOKEN,
+    default=DefaultBotProperties(parse_mode="HTML")
+)
 dp = Dispatcher()
 
 # --- база sqlite ---
