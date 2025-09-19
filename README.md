@@ -1,9 +1,8 @@
-# Referral Bot — FULL FINAL
+# Referral Bot — FINAL_OK
 
-Полная версия со всеми командами и исправленными строками (только \n, без незакрытых кавычек).  
-Проверено, SyntaxError быть не может.
+Финальная версия бота со всеми исправлениями (строки через \n, без SyntaxError).
 
-## Запуск
+## Запуск (Render как Background Worker)
 pip install -r requirements.txt
 export BOT_TOKEN=<токен>
 export ADMIN_ID=<id>

@@ -3,12 +3,14 @@ import os
 import csv
 import sqlite3
 import asyncio
+import logging
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 
+# ----------------- CONFIG -----------------
 API_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@producersdelok")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))
@@ -23,6 +25,15 @@ LEVELS = [
 TOP_LIMIT = 20
 SEASON_TOP_N_TO_SAVE = 3
 
+# ----------------- LOGGING -----------------
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("refbot")
+
+if not API_TOKEN:
+    log.error("BOT_TOKEN is not set in environment. Exiting.")
+    raise SystemExit(1)
+
+# ----------------- BOT CORE -----------------
 bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 router = Router()
@@ -31,6 +42,7 @@ dp.include_router(router)
 def current_season() -> str:
     return datetime.utcnow().strftime("%Y-%m")
 
+# ----------------- DB INIT -----------------
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
@@ -44,6 +56,7 @@ CREATE TABLE IF NOT EXISTS users (
     lifetime_referrals INTEGER DEFAULT 0
 )
 """)
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS prizes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,6 +65,7 @@ CREATE TABLE IF NOT EXISTS prizes (
     given_at TEXT DEFAULT CURRENT_TIMESTAMP
 )
 """)
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS season_winners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,6 +76,7 @@ CREATE TABLE IF NOT EXISTS season_winners (
     given_at TEXT DEFAULT CURRENT_TIMESTAMP
 )
 """)
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS awarded_levels (
     tg_id INTEGER,
@@ -75,16 +90,16 @@ cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_lifetime ON users(lifetime_
 cursor.execute("CREATE INDEX IF NOT EXISTS idx_season_winners_season ON season_winners(season)")
 conn.commit()
 
+# ----------------- DB UTILS -----------------
 def get_user(tg_id: int):
-    cursor.execute("SELECT tg_id, username, referrer_id, referrals_count, suspicious, lifetime_referrals FROM users WHERE tg_id=?", (tg_id,))
+    cursor.execute("SELECT tg_id, username, referrer_id, referrals_count, suspicious, lifetime_referrals FROM users WHERE tg_id=?",
+                   (tg_id,))
     return cursor.fetchone()
 
 def add_user(tg_id, username, referrer_id=None, suspicious=0):
     try:
-        cursor.execute(
-            "INSERT INTO users (tg_id, username, referrer_id, suspicious) VALUES (?, ?, ?, ?)",
-            (tg_id, username, referrer_id, suspicious)
-        )
+        cursor.execute("INSERT INTO users (tg_id, username, referrer_id, suspicious) VALUES (?, ?, ?, ?)",
+                       (tg_id, username, referrer_id, suspicious))
         conn.commit()
     except sqlite3.IntegrityError:
         pass
@@ -108,6 +123,7 @@ def check_and_award_levels(tg_id: int):
                 cursor.execute("INSERT INTO prizes (tg_id, prize) VALUES (?, ?)", (tg_id, f"Приз за уровень {threshold}: {prize_name}"))
                 conn.commit()
 
+# ----------------- HANDLERS: PARTICIPANTS -----------------
 @router.message(CommandStart(deep_link=True))
 async def start_deeplink(msg: types.Message, command: CommandStart):
     user_id = msg.from_user.id
@@ -118,8 +134,8 @@ async def start_deeplink(msg: types.Message, command: CommandStart):
         if getattr(member, "status", "left") in ["left", "kicked"]:
             await msg.answer(f"Чтобы участвовать, подпишись на {CHANNEL_ID} и снова нажми /start")
             return
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning(f"get_chat_member failed: {e}")
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="Я не бот 🟢", callback_data=f"captcha_ok:{user_id}:{referrer_id or 0}")
@@ -134,8 +150,8 @@ async def start_plain(msg: types.Message):
         if getattr(member, "status", "left") in ["left", "kicked"]:
             await msg.answer(f"Чтобы участвовать, подпишись на {CHANNEL_ID} и снова нажми /start")
             return
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning(f"get_chat_member failed: {e}")
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="Я не бот 🟢", callback_data=f"captcha_ok:{user_id}:0")
@@ -181,7 +197,9 @@ async def me(msg: types.Message):
         f"Твоя ссылка: https://t.me/{(await bot.me()).username}?start={user_id}"
     )
 
+# ----------------- RUN -----------------
 async def main():
+    log.info("Bot starting polling...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
