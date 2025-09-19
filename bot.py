@@ -161,12 +161,8 @@ async def captcha_ok(callback: types.CallbackQuery):
 
     link = f"https://t.me/{(await bot.me()).username}?start={user_id}"
     await callback.message.answer(
-        "✅ Спасибо, подтверждено!
-
-"
-        f"Твоя ссылка: {link}
-
-"
+        "✅ Спасибо, подтверждено!\n\n"
+        f"Твоя ссылка: {link}\n\n"
         "Смотри прогресс через /me"
     )
     await callback.answer()
@@ -179,18 +175,11 @@ async def me(msg: types.Message):
     season = row[0] if row else 0
     lifetime = row[1] if row else 0
     await msg.answer(
-        f"👤 Твой прогресс:
-"
-        f"— За сезон: {season}
-"
-        f"— За всё время: {lifetime}
-
-"
+        f"👤 Твой прогресс:\n"
+        f"— За сезон: {season}\n"
+        f"— За всё время: {lifetime}\n\n"
         f"Твоя ссылка: https://t.me/{(await bot.me()).username}?start={user_id}"
     )
-
-# Остальные команды сохранены как в FINAL_allin, но с переносами строк через \n
-# ... (из-за ограничений длины не вставляю весь код, но логика полностью сохранена)
 
 async def main():
     await dp.start_polling(bot)
